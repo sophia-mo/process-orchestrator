@@ -1,5 +1,11 @@
 import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+import LockIcon from '@mui/icons-material/Lock';
+import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
+import ControlPointIcon from '@mui/icons-material/ControlPoint';
 
 interface ActuatorNodeProps {
   id: string;
@@ -11,16 +17,16 @@ interface ActuatorNodeProps {
   isConnectable: boolean;
 }
 
-const actuatorIcons: Record<string, string> = {
-  start: '▶️',
-  stop: '⏹️',
-  open: '🔓',
-  close: '🔒',
-  set_value: '⚙️',
+const actuatorIcons: Record<string, React.ReactElement> = {
+  start: <PlayArrowIcon />,
+  stop: <StopIcon />,
+  open: <LockOpenIcon />,
+  close: <LockIcon />,
+  set_value: <SettingsApplicationsIcon />,
 };
 
 function ActuatorNode({ id, data, isConnectable }: ActuatorNodeProps) {
-  const icon = data.actuatorType ? actuatorIcons[data.actuatorType] : '🎯';
+  const icon = data.actuatorType ? actuatorIcons[data.actuatorType] : <ControlPointIcon />;
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
   const { updateNodeData } = useReactFlow();
@@ -60,7 +66,7 @@ function ActuatorNode({ id, data, isConnectable }: ActuatorNodeProps) {
         style={{ background: '#dc2626' }}
       />
 
-      <div style={{ fontSize: '32px', marginBottom: '8px' }}>{icon}</div>
+      <div style={{ marginBottom: '8px', color: '#dc2626' }}>{icon}</div>
       {isEditing ? (
         <input
           type="text"

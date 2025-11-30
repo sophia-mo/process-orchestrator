@@ -1,5 +1,13 @@
 import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
+import MergeIcon from '@mui/icons-material/Merge';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
+import NotInterestedIcon from '@mui/icons-material/NotInterested';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import DragHandleIcon from '@mui/icons-material/DragHandle';
+import TimerIcon from '@mui/icons-material/Timer';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 interface LogicNodeProps {
   id: string;
@@ -11,15 +19,15 @@ interface LogicNodeProps {
   isConnectable: boolean;
 }
 
-const logicIcons: Record<string, string> = {
-  and: '∧',
-  or: '∨',
-  not: '¬',
-  greater_than: '>',
-  less_than: '<',
-  equal: '=',
-  delay: '⏱️',
-  if: '❓',
+const logicIcons: Record<string, React.ReactElement> = {
+  and: <MergeIcon />,
+  or: <CallSplitIcon />,
+  not: <NotInterestedIcon />,
+  greater_than: <KeyboardArrowRightIcon />,
+  less_than: <KeyboardArrowLeftIcon />,
+  equal: <DragHandleIcon />,
+  delay: <TimerIcon />,
+  if: <HelpOutlineIcon />,
 };
 
 const logicColors: Record<string, { bg: string; border: string; text: string }> = {
@@ -35,7 +43,7 @@ const logicColors: Record<string, { bg: string; border: string; text: string }> 
 
 function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
   const logicType = data.logicType || 'and';
-  const icon = logicIcons[logicType] || '?';
+  const icon = logicIcons[logicType] || <HelpOutlineIcon />;
   const colors = logicColors[logicType] || logicColors.and;
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
@@ -108,7 +116,7 @@ function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
         style={{ background: colors.border }}
       />
 
-      <div style={{ fontSize: '28px', marginBottom: '8px', fontWeight: 'bold' }}>
+      <div style={{ marginBottom: '8px', fontWeight: 'bold', color: colors.border }}>
         {icon}
       </div>
       {isEditing ? (

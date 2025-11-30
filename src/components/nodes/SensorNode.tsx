@@ -1,5 +1,10 @@
 import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import DeviceThermostatIcon from '@mui/icons-material/DeviceThermostat';
+import CompressIcon from '@mui/icons-material/Compress';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import SensorsIcon from '@mui/icons-material/Sensors';
 
 interface SensorNodeProps {
   id: string;
@@ -11,15 +16,15 @@ interface SensorNodeProps {
   isConnectable: boolean;
 }
 
-const sensorIcons: Record<string, string> = {
-  level: '📊',
-  temperature: '🌡️',
-  pressure: '🔩',
-  flow_rate: '💧',
+const sensorIcons: Record<string, React.ReactElement> = {
+  level: <ShowChartIcon />,
+  temperature: <DeviceThermostatIcon />,
+  pressure: <CompressIcon />,
+  flow_rate: <WaterDropIcon />,
 };
 
 function SensorNode({ id, data, isConnectable }: SensorNodeProps) {
-  const icon = data.sensorType ? sensorIcons[data.sensorType] : '📡';
+  const icon = data.sensorType ? sensorIcons[data.sensorType] : <SensorsIcon />;
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
   const [isEditingThreshold, setIsEditingThreshold] = useState(false);
@@ -83,7 +88,7 @@ function SensorNode({ id, data, isConnectable }: SensorNodeProps) {
         style={{ background: '#059669' }}
       />
 
-      <div style={{ fontSize: '32px', marginBottom: '8px' }}>{icon}</div>
+      <div style={{ marginBottom: '8px', color: '#059669' }}>{icon}</div>
       {isEditing ? (
         <input
           type="text"

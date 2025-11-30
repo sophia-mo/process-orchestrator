@@ -1,5 +1,11 @@
 import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
+import WaterIcon from '@mui/icons-material/Water';
+import SettingsIcon from '@mui/icons-material/Settings';
+import TuneIcon from '@mui/icons-material/Tune';
+import BoltIcon from '@mui/icons-material/Bolt';
+import LocalFireDepartmentIcon from '@mui/icons-material/LocalFireDepartment';
+import InventoryIcon from '@mui/icons-material/Inventory';
 
 interface DeviceNodeProps {
   id: string;
@@ -11,16 +17,16 @@ interface DeviceNodeProps {
   isConnectable: boolean;
 }
 
-const deviceIcons: Record<string, string> = {
-  tank: '🛢️',
-  pump: '⚙️',
-  valve: '🔧',
-  electrolyzer: '⚡',
-  heat_exchanger: '🔥',
+const deviceIcons: Record<string, React.ReactElement> = {
+  tank: <WaterIcon />,
+  pump: <SettingsIcon />,
+  valve: <TuneIcon />,
+  electrolyzer: <BoltIcon />,
+  heat_exchanger: <LocalFireDepartmentIcon />,
 };
 
 function DeviceNode({ id, data, isConnectable }: DeviceNodeProps) {
-  const icon = data.deviceType ? deviceIcons[data.deviceType] : '📦';
+  const icon = data.deviceType ? deviceIcons[data.deviceType] : <InventoryIcon />;
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
   const { updateNodeData } = useReactFlow();
@@ -60,7 +66,7 @@ function DeviceNode({ id, data, isConnectable }: DeviceNodeProps) {
         style={{ background: '#2563eb' }}
       />
 
-      <div style={{ fontSize: '32px', marginBottom: '8px' }}>{icon}</div>
+      <div style={{ marginBottom: '8px', color: '#2563eb' }}>{icon}</div>
       {isEditing ? (
         <input
           type="text"
