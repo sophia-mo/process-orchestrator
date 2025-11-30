@@ -2,9 +2,6 @@ import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
-import LockOpenIcon from '@mui/icons-material/LockOpen';
-import LockIcon from '@mui/icons-material/Lock';
-import SettingsApplicationsIcon from '@mui/icons-material/SettingsApplications';
 import ControlPointIcon from '@mui/icons-material/ControlPoint';
 
 interface ActuatorNodeProps {
@@ -20,9 +17,6 @@ interface ActuatorNodeProps {
 const actuatorIcons: Record<string, React.ReactElement> = {
   start: <PlayArrowIcon />,
   stop: <StopIcon />,
-  open: <LockOpenIcon />,
-  close: <LockIcon />,
-  set_value: <SettingsApplicationsIcon />,
 };
 
 function ActuatorNode({ id, data, isConnectable }: ActuatorNodeProps) {
@@ -61,7 +55,7 @@ function ActuatorNode({ id, data, isConnectable }: ActuatorNodeProps) {
     >
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         isConnectable={isConnectable}
         style={{ background: '#dc2626' }}
       />
@@ -107,7 +101,7 @@ function ActuatorNode({ id, data, isConnectable }: ActuatorNodeProps) {
 
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         isConnectable={isConnectable}
         style={{ background: '#dc2626' }}
       />

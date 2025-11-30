@@ -290,25 +290,29 @@ export class DSLConverter {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const nodeMap = new Map<string, Node>();
-    let yPosition = 100;
+    const xPosition = 100; // Fixed x-position
+    let yPosition = 0;
 
     rules.forEach((rule) => {
       const ruleNodes: Node[] = [];
       const ruleEdges: Edge[] = [];
 
       // Build condition nodes (recursively)
-      const { nodes: conditionNodes, edges: conditionEdges, outputNodeId } =
-        this.conditionToNodes(rule.condition, 0, yPosition);
+      const { nodes: conditionNodes, edges: conditionEdges, outputNodeId, nodeCount } =
+        this.conditionToNodes(rule.condition, xPosition, yPosition);
 
       ruleNodes.push(...conditionNodes);
       ruleEdges.push(...conditionEdges);
+
+      // Update y-position for next node (200px per node)
+      yPosition += nodeCount * 200;
 
       // Build actuator node
       const actuatorId = `actuator_${rule.action.actuatorType}`;
       const actuatorNode: Node = {
         id: actuatorId,
         type: 'actuator',
-        position: { x: (conditionNodes.length + 1) * 100, y: yPosition },
+        position: { x: xPosition, y: yPosition },
         data: {
           label: `${rule.action.actuatorType.toUpperCase()}`,
           actuatorType: rule.action.actuatorType,
@@ -316,6 +320,7 @@ export class DSLConverter {
         },
       };
       ruleNodes.push(actuatorNode);
+      yPosition += 200;
 
       // Connect last condition node to actuator
       if (outputNodeId) {
@@ -337,7 +342,7 @@ export class DSLConverter {
         const deviceNode: Node = {
           id: rule.action.targetId,
           type: 'device',
-          position: { x: (conditionNodes.length + 2) * 100, y: yPosition },
+          position: { x: xPosition, y: yPosition },
           data: {
             label: rule.action.targetLabel || rule.action.targetId,
             deviceType,
@@ -345,6 +350,7 @@ export class DSLConverter {
           },
         };
         ruleNodes.push(deviceNode);
+        yPosition += 200;
 
         // Connect actuator to device
         ruleEdges.push({
@@ -362,8 +368,6 @@ export class DSLConverter {
         }
       });
       edges.push(...ruleEdges);
-
-      yPosition += 150; // Offset for next rule
     });
 
     return { nodes, edges };
@@ -374,11 +378,12 @@ export class DSLConverter {
    */
   private static conditionToNodes(
     condition: Condition,
-    xOffset: number,
+    xPosition: number,
     yPosition: number
-  ): { nodes: Node[]; edges: Edge[]; outputNodeId: string } {
+  ): { nodes: Node[]; edges: Edge[]; outputNodeId: string; nodeCount: number } {
     const nodes: Node[] = [];
     const edges: Edge[] = [];
+    let currentY = yPosition;
 
     switch (condition.type) {
       case 'sensor': {
@@ -392,7 +397,7 @@ export class DSLConverter {
           const deviceNode: Node = {
             id: condition.sourceDeviceId,
             type: 'device',
-            position: { x: (xOffset - 1) * 200, y: yPosition },
+            position: { x: xPosition, y: currentY },
             data: {
               label: condition.sourceDeviceLabel || condition.sourceDeviceId,
               deviceType,
@@ -400,12 +405,13 @@ export class DSLConverter {
             },
           };
           nodes.push(deviceNode);
+          currentY += 200;
         }
 
         const sensorNode: Node = {
           id: condition.sensorId,
           type: 'sensor',
-          position: { x: xOffset * 200, y: yPosition },
+          position: { x: xPosition, y: currentY },
           data: {
             label: condition.sensorLabel || `${condition.sensorType} sensor`,
             sensorType: condition.sensorType,
@@ -413,6 +419,7 @@ export class DSLConverter {
           },
         };
         nodes.push(sensorNode);
+        currentY += 200;
 
         // Connect device to sensor if source device exists
         if (condition.sourceDeviceId) {
@@ -423,7 +430,7 @@ export class DSLConverter {
           });
         }
 
-        return { nodes, edges, outputNodeId: condition.sensorId };
+        return { nodes, edges, outputNodeId: condition.sensorId, nodeCount: nodes.length };
       }
 
       case 'comparison': {
@@ -440,7 +447,7 @@ export class DSLConverter {
             const deviceNode: Node = {
               id: condition.left.sourceDeviceId,
               type: 'device',
-              position: { x: (xOffset - 1) * 200, y: yPosition },
+              position: { x: xPosition, y: currentY },
               data: {
                 label: condition.left.sourceDeviceLabel || condition.left.sourceDeviceId,
                 deviceType,
@@ -448,12 +455,13 @@ export class DSLConverter {
               },
             };
             nodes.push(deviceNode);
+            currentY += 200;
           }
 
           const sensorNode: Node = {
             id: condition.left.sensorId,
             type: 'sensor',
-            position: { x: xOffset * 200, y: yPosition },
+            position: { x: xPosition, y: currentY },
             data: {
               label: condition.left.sensorLabel || condition.left.sensorId,
               sensorType: 'level', // Default
@@ -462,6 +470,7 @@ export class DSLConverter {
           };
           nodes.push(sensorNode);
           sensorId = condition.left.sensorId;
+          currentY += 200;
 
           // Connect device to sensor if source device exists
           if (condition.left.sourceDeviceId) {
@@ -484,7 +493,7 @@ export class DSLConverter {
         const logicNode: Node = {
           id: logicId,
           type: 'logic',
-          position: { x: (xOffset + 1) * 200, y: yPosition },
+          position: { x: xPosition, y: currentY },
           data: {
             label: condition.operator,
             logicType: operatorMap[condition.operator] || 'greater_than',
@@ -494,6 +503,7 @@ export class DSLConverter {
           },
         };
         nodes.push(logicNode);
+        currentY += 200;
 
         // Connect sensor to logic
         if (sensorId) {
@@ -504,16 +514,32 @@ export class DSLConverter {
           });
         }
 
-        return { nodes, edges, outputNodeId: logicId };
+        return { nodes, edges, outputNodeId: logicId, nodeCount: nodes.length };
       }
 
       case 'logical': {
-        // Create logic node
+        // Recursively process operands first
+        let totalNodeCount = 0;
+        const operandOutputs: string[] = [];
+
+        condition.operands.forEach((operand) => {
+          const { nodes: childNodes, edges: childEdges, outputNodeId, nodeCount } =
+            this.conditionToNodes(operand, xPosition, currentY);
+
+          nodes.push(...childNodes);
+          edges.push(...childEdges);
+          operandOutputs.push(outputNodeId);
+
+          currentY += nodeCount * 200;
+          totalNodeCount += nodeCount;
+        });
+
+        // Create logic node after operands
         const logicId = `logic_${condition.operator}_${Date.now()}`;
         const logicNode: Node = {
           id: logicId,
           type: 'logic',
-          position: { x: (xOffset + condition.operands.length) * 200, y: yPosition },
+          position: { x: xPosition, y: currentY },
           data: {
             label: condition.operator.toUpperCase(),
             logicType: condition.operator,
@@ -521,55 +547,52 @@ export class DSLConverter {
           },
         };
         nodes.push(logicNode);
+        totalNodeCount++;
 
-        // Recursively process operands
-        condition.operands.forEach((operand, idx) => {
-          const { nodes: childNodes, edges: childEdges, outputNodeId } =
-            this.conditionToNodes(operand, xOffset + idx, yPosition + (idx * 50));
-
-          nodes.push(...childNodes);
-          edges.push(...childEdges);
-
-          // Connect operand output to this logic node
+        // Connect all operand outputs to this logic node
+        operandOutputs.forEach((outputId) => {
           edges.push({
-            id: `${outputNodeId}-${logicId}`,
-            source: outputNodeId,
+            id: `${outputId}-${logicId}`,
+            source: outputId,
             target: logicId,
           });
         });
 
-        return { nodes, edges, outputNodeId: logicId };
+        return { nodes, edges, outputNodeId: logicId, nodeCount: totalNodeCount };
       }
 
       case 'delay': {
-        const { nodes: innerNodes, edges: innerEdges, outputNodeId: innerId } =
-          this.conditionToNodes(condition.condition, xOffset, yPosition);
+        const { nodes: innerNodes, edges: innerEdges, outputNodeId: innerId, nodeCount: innerCount } =
+          this.conditionToNodes(condition.condition, xPosition, currentY);
+
+        nodes.push(...innerNodes);
+        edges.push(...innerEdges);
+        currentY += innerCount * 200;
 
         const delayId = `delay_${Date.now()}`;
         const delayNode: Node = {
           id: delayId,
           type: 'logic',
-          position: { x: (xOffset + innerNodes.length) * 200, y: yPosition },
+          position: { x: xPosition, y: currentY },
           data: {
             label: `Delay ${condition.delayMs}ms`,
             logicType: 'delay',
             config: { delayMs: condition.delayMs },
           },
         };
+        nodes.push(delayNode);
 
-        nodes.push(...innerNodes, delayNode);
-        edges.push(...innerEdges);
         edges.push({
           id: `${innerId}-${delayId}`,
           source: innerId,
           target: delayId,
         });
 
-        return { nodes, edges, outputNodeId: delayId };
+        return { nodes, edges, outputNodeId: delayId, nodeCount: innerCount + 1 };
       }
 
       default:
-        return { nodes, edges, outputNodeId: '' };
+        return { nodes, edges, outputNodeId: '', nodeCount: 0 };
     }
   }
 

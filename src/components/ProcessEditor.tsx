@@ -8,13 +8,27 @@ import {
   useNodesState,
   useEdgesState,
 } from '@xyflow/react';
-import type {
-  Connection,
-  Node,
-  Edge,
-  NodeTypes,
-} from '@xyflow/react';
+import type { Connection, Node, Edge, NodeTypes } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+
+import PropaneTankIcon from '@mui/icons-material/PropaneTank';
+import ShutterSpeedIcon from '@mui/icons-material/ShutterSpeed';
+import SchemaIcon from '@mui/icons-material/Schema';
+import WaterIcon from '@mui/icons-material/Water';
+import DeviceThermostatIcon from '@mui/icons-material/DeviceThermostat';
+import SpeedIcon from '@mui/icons-material/Speed';
+import MergeIcon from '@mui/icons-material/Merge';
+import CallSplitIcon from '@mui/icons-material/CallSplit';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import TimerIcon from '@mui/icons-material/Timer';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import Stack from '@mui/material/Stack';
+import CheckIcon from '@mui/icons-material/Check';
+import ErrorIcon from '@mui/icons-material/Error';
 
 import DeviceNode from './nodes/DeviceNode';
 import SensorNode from './nodes/SensorNode';
@@ -37,6 +51,15 @@ export default function ProcessEditor() {
   const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [rulesJson, setRulesJson] = useState('');
   const [isEditingRules, setIsEditingRules] = useState(false);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
 
   // Update Rules whenever graph changes (only when not editing)
   useEffect(() => {
@@ -65,7 +88,11 @@ export default function ProcessEditor() {
       if (!hasError) {
         setEdges((eds) => addEdge(connection, eds));
       } else {
-        alert('Invalid connection: ' + validation.errors[0].message);
+        setSnackbar({
+          open: true,
+          message: 'Invalid connection: ' + validation.errors[0].message,
+          severity: 'error',
+        });
       }
     },
     [edges, nodes, setEdges]
@@ -118,31 +145,31 @@ export default function ProcessEditor() {
       {
         id: 'tank_a',
         type: 'device',
-        position: { x: 50, y: 100 },
+        position: { x: 100, y: 0 },
         data: { label: 'Tank A', deviceType: 'tank' },
       },
       {
         id: 'level_sensor',
         type: 'sensor',
-        position: { x: 250, y: 100 },
-        data: { label: 'Level > 80%', sensorType: 'level', config: { threshold: 80 } },
+        position: { x: 100, y: 200 },
+        data: { label: 'Level Sensor', sensorType: 'level'},
       },
       {
         id: 'greater_than',
         type: 'logic',
-        position: { x: 450, y: 100 },
-        data: { label: '> 80', logicType: 'greater_than', config: { threshold: 80 } },
+        position: { x: 100, y: 400 },
+        data: { label: 'Greater than', logicType: 'greater_than', config: { threshold: 80 } },
       },
       {
         id: 'stop_actuator',
         type: 'actuator',
-        position: { x: 650, y: 100 },
+        position: { x: 100, y: 600 },
         data: { label: 'Stop Pump', actuatorType: 'stop' },
       },
       {
         id: 'pump_c',
         type: 'device',
-        position: { x: 850, y: 100 },
+        position: { x: 100, y: 800 },
         data: { label: 'Pump C', deviceType: 'pump' },
       },
     ];
@@ -165,48 +192,44 @@ export default function ProcessEditor() {
         style={{
           width: '250px',
           background: '#f8f9fa',
-          padding: '20px',
+          padding: '0 20px 20px 20px',
           borderRight: '1px solid #ddd',
           overflowY: 'auto',
         }}
       >
-        <h3 style={{ marginTop: 0 }}>Node Palette</h3>
 
         <div style={{ marginBottom: '20px' }}>
           <h4>Devices</h4>
-          <NodePaletteItem type="device" subtype="tank" label="Tank" icon="🛢️" />
-          <NodePaletteItem type="device" subtype="pump" label="Pump" icon="⚙️" />
-          <NodePaletteItem type="device" subtype="valve" label="Valve" icon="🔧" />
+          <NodePaletteItem type="device" subtype="tank" label="Tank" icon={<PropaneTankIcon />} />
+          <NodePaletteItem type="device" subtype="pump" label="Pump" icon={<ShutterSpeedIcon />} />
+          <NodePaletteItem type="device" subtype="valve" label="Valve" icon={<SchemaIcon />} />
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <h4>Sensors</h4>
-          <NodePaletteItem type="sensor" subtype="level" label="Level Sensor" icon="📊" />
+          <NodePaletteItem type="sensor" subtype="level" label="Level Sensor" icon={<WaterIcon />} />
           <NodePaletteItem
             type="sensor"
             subtype="temperature"
             label="Temperature"
-            icon="🌡️"
+            icon={<DeviceThermostatIcon />}
           />
-          <NodePaletteItem type="sensor" subtype="pressure" label="Pressure" icon="🔩" />
+          <NodePaletteItem type="sensor" subtype="pressure" label="Pressure" icon={<SpeedIcon />} />
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <h4>Logic</h4>
-          <NodePaletteItem type="logic" subtype="and" label="AND" icon="∧" />
-          <NodePaletteItem type="logic" subtype="or" label="OR" icon="∨" />
-          <NodePaletteItem type="logic" subtype="not" label="NOT" icon="¬" />
-          <NodePaletteItem type="logic" subtype="greater_than" label=">" icon=">" />
-          <NodePaletteItem type="logic" subtype="less_than" label="<" icon="<" />
-          <NodePaletteItem type="logic" subtype="delay" label="Delay" icon="⏱️" />
+          <NodePaletteItem type="logic" subtype="and" label="AND" icon={<MergeIcon />} />
+          <NodePaletteItem type="logic" subtype="or" label="OR" icon={<CallSplitIcon />} />
+          <NodePaletteItem type="logic" subtype="greater_than" label="Greater than" icon={<KeyboardArrowRightIcon />} />
+          <NodePaletteItem type="logic" subtype="less_than" label="Less than" icon={<KeyboardArrowLeftIcon />} />
+          <NodePaletteItem type="logic" subtype="delay" label="Delay" icon={<TimerIcon />} />
         </div>
 
         <div style={{ marginBottom: '20px' }}>
           <h4>Actuators</h4>
-          <NodePaletteItem type="actuator" subtype="start" label="Start" icon="▶️" />
-          <NodePaletteItem type="actuator" subtype="stop" label="Stop" icon="⏹️" />
-          <NodePaletteItem type="actuator" subtype="open" label="Open" icon="🔓" />
-          <NodePaletteItem type="actuator" subtype="close" label="Close" icon="🔒" />
+          <NodePaletteItem type="actuator" subtype="start" label="Start" icon={<PlayArrowIcon />} />
+          <NodePaletteItem type="actuator" subtype="stop" label="Stop" icon={<StopIcon />} />
         </div>
 
         <div style={{ marginTop: '30px' }}>
@@ -279,21 +302,18 @@ export default function ProcessEditor() {
         {/* Validation Errors */}
         {validationErrors.length > 0 && (
           <div style={{ marginBottom: '20px' }}>
-            <h4 style={{ color: '#f87171' }}>Validation</h4>
-            {validationErrors.map((error, idx) => (
-              <div
-                key={idx}
-                style={{
-                  padding: '8px',
-                  marginBottom: '5px',
-                  background: error.type === 'error' ? '#7f1d1d' : '#78350f',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                {error.type === 'error' ? '❌' : '⚠️'} {error.message}
-              </div>
-            ))}
+            <h4 style={{ color: '#f87171', marginTop: 0 }}>Validation</h4>
+            <Stack sx={{ width: '100%' }} spacing={1}>
+              {validationErrors.map((error, idx) => (
+                <Alert
+                  key={idx}
+                  severity={error.type === 'error' ? 'error' : 'warning'}
+                  sx={{ fontSize: '12px' }}
+                >
+                  {error.message}
+                </Alert>
+              ))}
+            </Stack>
           </div>
         )}
 
@@ -312,62 +332,43 @@ export default function ProcessEditor() {
                 fontSize: '12px',
               }}
             >
-              {isEditingRules ? '📖 View Mode' : '✏️ Edit Mode'}
+              {isEditingRules ? 'View Mode' : 'Edit Mode'}
             </button>
             {isEditingRules && (
-              <>
-                <button
-                  onClick={() => {
-                    const rules = DSLConverter.graphToRules(nodes, edges);
-                    setRulesJson(JSON.stringify(rules, null, 2));
-                  }}
-                  style={{
-                    padding: '8px 12px',
-                    background: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  🔄 Regenerate from Graph
-                </button>
-                <button
-                  onClick={() => {
-                    try {
-                      console.log('📥 Parsing rules JSON...');
-                      const rules = JSON.parse(rulesJson);
-                      console.log('Parsed rules:', rules);
-
-                      // Convert rules back to graph
-                      const { nodes: newNodes, edges: newEdges } = DSLConverter.rulesToGraph(rules);
-                      console.log('✅ Generated from rules:');
-                      console.log('  Nodes:', newNodes.length);
-                      console.log('  Edges:', newEdges.length);
-
-                      setNodes(newNodes);
-                      setEdges(newEdges);
-                      setIsEditingRules(false);
-                      alert(`✅ Rules applied! Generated ${newNodes.length} nodes and ${newEdges.length} edges.`);
-                    } catch (error) {
-                      console.error('❌ Error:', error);
-                      alert('❌ Error: ' + (error as Error).message);
-                    }
-                  }}
-                  style={{
-                    padding: '8px 12px',
-                    background: '#8b5cf6',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  ⬅️ Apply to Graph
-                </button>
-              </>
+              <button
+                onClick={() => {
+                  try {
+                    const rules = JSON.parse(rulesJson);
+                    // Convert rules back to graph
+                    const { nodes: newNodes, edges: newEdges } = DSLConverter.rulesToGraph(rules);
+                    setNodes(newNodes);
+                    setEdges(newEdges);
+                    setIsEditingRules(false);
+                    setSnackbar({
+                      open: true,
+                      message: `Rules applied! Generated ${newNodes.length} nodes and ${newEdges.length} edges.`,
+                      severity: 'success',
+                    });
+                  } catch (error) {
+                    setSnackbar({
+                      open: true,
+                      message: 'Error: ' + (error as Error).message,
+                      severity: 'error',
+                    });
+                  }
+                }}
+                style={{
+                  padding: '8px 12px',
+                  background: '#8b5cf6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '5px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                }}
+              >
+                Apply to Graph
+              </button>
             )}
           </div>
           <textarea
@@ -391,6 +392,23 @@ export default function ProcessEditor() {
           />
         </div>
       </div>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          icon={snackbar.severity === 'success' ? <CheckIcon fontSize="inherit" /> : <ErrorIcon fontSize="inherit" />}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
@@ -399,7 +417,7 @@ interface NodePaletteItemProps {
   type: string;
   subtype: string;
   label: string;
-  icon: string;
+  icon: React.ReactElement;
 }
 
 function NodePaletteItem({ type, subtype, label, icon }: NodePaletteItemProps) {
@@ -426,7 +444,7 @@ function NodePaletteItem({ type, subtype, label, icon }: NodePaletteItemProps) {
         gap: '10px',
       }}
     >
-      <span style={{ fontSize: '20px' }}>{icon}</span>
+      <span style={{ display: 'flex', alignItems: 'center', color: '#666' }}>{icon}</span>
       <span style={{ fontSize: '13px' }}>{label}</span>
     </div>
   );

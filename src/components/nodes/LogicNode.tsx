@@ -2,12 +2,9 @@ import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import MergeIcon from '@mui/icons-material/Merge';
 import CallSplitIcon from '@mui/icons-material/CallSplit';
-import NotInterestedIcon from '@mui/icons-material/NotInterested';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
-import DragHandleIcon from '@mui/icons-material/DragHandle';
 import TimerIcon from '@mui/icons-material/Timer';
-import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 interface LogicNodeProps {
   id: string;
@@ -22,28 +19,22 @@ interface LogicNodeProps {
 const logicIcons: Record<string, React.ReactElement> = {
   and: <MergeIcon />,
   or: <CallSplitIcon />,
-  not: <NotInterestedIcon />,
   greater_than: <KeyboardArrowRightIcon />,
   less_than: <KeyboardArrowLeftIcon />,
-  equal: <DragHandleIcon />,
   delay: <TimerIcon />,
-  if: <HelpOutlineIcon />,
 };
 
 const logicColors: Record<string, { bg: string; border: string; text: string }> = {
   and: { bg: '#fef3c7', border: '#f59e0b', text: '#78350f' },
   or: { bg: '#fef3c7', border: '#f59e0b', text: '#78350f' },
-  not: { bg: '#fee2e2', border: '#ef4444', text: '#7f1d1d' },
   greater_than: { bg: '#e0e7ff', border: '#6366f1', text: '#312e81' },
   less_than: { bg: '#e0e7ff', border: '#6366f1', text: '#312e81' },
-  equal: { bg: '#e0e7ff', border: '#6366f1', text: '#312e81' },
   delay: { bg: '#ddd6fe', border: '#8b5cf6', text: '#4c1d95' },
-  if: { bg: '#fce7f3', border: '#ec4899', text: '#831843' },
 };
 
 function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
   const logicType = data.logicType || 'and';
-  const icon = logicIcons[logicType] || <HelpOutlineIcon />;
+  const icon = logicIcons[logicType];
   const colors = logicColors[logicType] || logicColors.and;
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
@@ -111,7 +102,7 @@ function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
     >
       <Handle
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         isConnectable={isConnectable}
         style={{ background: colors.border }}
       />
@@ -227,7 +218,7 @@ function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
 
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         isConnectable={isConnectable}
         style={{ background: colors.border }}
       />
