@@ -90,46 +90,134 @@ export class WorkflowValidator {
 
       if (!sourceNode || !targetNode) return;
 
-      // Specific rule: Sensors cannot directly connect to actuators
-      if (sourceNode.type === 'sensor' && targetNode.type === 'actuator') {
-        errors.push({
-          type: 'error',
-          edgeId: edge.id,
-          message:
-            'Sensors must connect through logic nodes before reaching actuators',
-          code: 'MISSING_LOGIC_NODE',
-        });
-      }
+      // ========== Device -> Sensor Compatibility ==========
 
-      // Specific rule: Devices cannot directly connect to each other
-      if (sourceNode.type === 'device' && targetNode.type === 'device') {
-        errors.push({
-          type: 'error',
-          edgeId: edge.id,
-          message:
-            'Devices cannot directly connect to each other. Use sensors and actuators.',
-          code: 'INVALID_DEVICE_CONNECTION',
-        });
-      }
-
-      // Warning: Pumps should have flow control logic
+      // Rule: Pumps cannot connect to temperature sensors (temperature not relevant for pumps)
       if (
+        sourceNode.type === 'device' &&
         sourceNode.data.deviceType === 'pump' &&
-        targetNode.type === 'actuator'
+        targetNode.type === 'sensor' &&
+        targetNode.data.sensorType === 'temperature'
       ) {
-        const hasLogicInBetween = this.hasIntermediateLogic(
-          edge.source,
-          edge.target,
+        errors.push({
+          type: 'error',
+          edgeId: edge.id,
+          message: 'Pumps cannot connect to temperature sensors. Use pressure or level sensors instead.',
+          code: 'INCOMPATIBLE_DEVICE_SENSOR',
+        });
+      }
+
+      // Rule: Tanks should use level sensors (most common case)
+      if (
+        sourceNode.type === 'device' &&
+        sourceNode.data.deviceType === 'tank' &&
+        targetNode.type === 'sensor' &&
+        targetNode.data.sensorType === 'pressure'
+      ) {
+        errors.push({
+          type: 'warning',
+          edgeId: edge.id,
+          message: 'Tanks typically use level sensors. Consider using a level sensor instead of pressure sensor.',
+          code: 'UNUSUAL_DEVICE_SENSOR',
+        });
+      }
+
+      // Rule: Valves typically use pressure or flow sensors
+      if (
+        sourceNode.type === 'device' &&
+        sourceNode.data.deviceType === 'valve' &&
+        targetNode.type === 'sensor' &&
+        targetNode.data.sensorType === 'level'
+      ) {
+        errors.push({
+          type: 'warning',
+          edgeId: edge.id,
+          message: 'Valves typically use pressure sensors. Consider using a pressure sensor instead of level sensor.',
+          code: 'UNUSUAL_DEVICE_SENSOR',
+        });
+      }
+
+      // ========== Actuator -> Device Compatibility ==========
+
+      // Rule: Start actuators should connect to active devices (pumps, valves)
+      if (
+        sourceNode.type === 'actuator' &&
+        sourceNode.data.actuatorType === 'start' &&
+        targetNode.type === 'device' &&
+        targetNode.data.deviceType === 'tank'
+      ) {
+        errors.push({
+          type: 'error',
+          edgeId: edge.id,
+          message: 'Cannot start a tank. Tanks are passive containers. Use start actuators for pumps or valves.',
+          code: 'INVALID_ACTUATOR_DEVICE',
+        });
+      }
+
+      // Rule: Stop actuators should connect to active devices (pumps, valves)
+      if (
+        sourceNode.type === 'actuator' &&
+        sourceNode.data.actuatorType === 'stop' &&
+        targetNode.type === 'device' &&
+        targetNode.data.deviceType === 'tank'
+      ) {
+        errors.push({
+          type: 'error',
+          edgeId: edge.id,
+          message: 'Cannot stop a tank. Tanks are passive containers. Use stop actuators for pumps or valves.',
+          code: 'INVALID_ACTUATOR_DEVICE',
+        });
+      }
+
+      // ========== Safety Logic Requirements ==========
+
+      // Warning: Pumps should have safety logic between sensor and actuator
+      if (
+        sourceNode.type === 'sensor' &&
+        targetNode.type === 'logic'
+      ) {
+        // Check if this logic eventually controls a pump
+        const controlsPump = this.eventuallyControlsDevice(
+          targetNode.id,
+          'pump',
           nodes,
           edges
         );
 
-        if (!hasLogicInBetween) {
+        if (controlsPump) {
+          const logicType = targetNode.data.logicType;
+
+          // Pumps should have threshold logic (greater_than, less_than)
+          if (logicType === 'and' || logicType === 'or') {
+            // This is fine - composite logic is acceptable
+          } else if (!logicType || logicType === 'delay') {
+            errors.push({
+              type: 'warning',
+              edgeId: edge.id,
+              message: 'Pump control should include threshold comparisons for safety (e.g., level > 80%)',
+              code: 'MISSING_SAFETY_THRESHOLD',
+            });
+          }
+        }
+      }
+
+      // ========== Path Validation ==========
+
+      // Rule: Check for complete control paths (Device -> Sensor -> Logic -> Actuator -> Device)
+      if (sourceNode.type === 'device' && targetNode.type === 'sensor') {
+        // Check if this sensor eventually leads to an actuator
+        const hasCompleteControlPath = this.hasCompleteControlPath(
+          targetNode.id,
+          nodes,
+          edges
+        );
+
+        if (!hasCompleteControlPath && edges.length > 3) {
           errors.push({
             type: 'warning',
             edgeId: edge.id,
-            message: 'Pump control should include safety logic (recommended)',
-            code: 'MISSING_SAFETY_LOGIC',
+            message: 'This sensor does not lead to any actuator. Consider completing the control path.',
+            code: 'INCOMPLETE_CONTROL_PATH',
           });
         }
       }
@@ -139,30 +227,71 @@ export class WorkflowValidator {
   }
 
   /**
-   * Check if there's logic node between source and target
+   * Check if a node eventually controls a specific device type
    */
-  private static hasIntermediateLogic(
-    sourceId: string,
-    targetId: string,
+  private static eventuallyControlsDevice(
+    nodeId: string,
+    deviceType: string,
     nodes: Node[],
     edges: Edge[]
   ): boolean {
-    // Simple BFS to check if any logic node is on the path
     const visited = new Set<string>();
-    const queue: string[] = [sourceId];
+    const queue: string[] = [nodeId];
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
 
-      if (currentId === targetId) continue;
       if (visited.has(currentId)) continue;
-
       visited.add(currentId);
 
       const currentNode = nodes.find((n) => n.id === currentId);
-      if (currentNode?.type === 'logic') return true;
 
-      // Add connected nodes to queue
+      // Check if we reached a device of the target type
+      if (
+        currentNode?.type === 'device' &&
+        currentNode.data.deviceType === deviceType
+      ) {
+        return true;
+      }
+
+      // Continue searching downstream
+      const outgoingEdges = edges.filter((e) => e.source === currentId);
+      outgoingEdges.forEach((e) => queue.push(e.target));
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if a sensor has a complete path to an actuator through logic
+   */
+  private static hasCompleteControlPath(
+    sensorId: string,
+    nodes: Node[],
+    edges: Edge[]
+  ): boolean {
+    const visited = new Set<string>();
+    const queue: string[] = [sensorId];
+    let hasLogic = false;
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      const currentNode = nodes.find((n) => n.id === currentId);
+
+      if (currentNode?.type === 'logic') {
+        hasLogic = true;
+      }
+
+      // Check if we reached an actuator
+      if (currentNode?.type === 'actuator' && hasLogic) {
+        return true;
+      }
+
+      // Continue searching downstream
       const outgoingEdges = edges.filter((e) => e.source === currentId);
       outgoingEdges.forEach((e) => queue.push(e.target));
     }

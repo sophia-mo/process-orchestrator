@@ -148,16 +148,19 @@ export interface NodeCompatibility {
 }
 
 export const NODE_COMPATIBILITY_RULES: NodeCompatibility[] = [
+  // Devices can connect to sensors
+  { sourceType: 'device', targetType: 'sensor', allowed: true },
+
   // Sensors can connect to logic nodes
   { sourceType: 'sensor', targetType: 'logic', allowed: true },
 
-  // Logic nodes can connect to other logic nodes
+  // Logic nodes can connect to other logic nodes (for complex conditions)
   { sourceType: 'logic', targetType: 'logic', allowed: true },
 
   // Logic nodes can connect to actuators
   { sourceType: 'logic', targetType: 'actuator', allowed: true },
 
-  // Actuators can connect to devices
+  // Actuators can connect to devices (e.g., Start -> Pump)
   { sourceType: 'actuator', targetType: 'device', allowed: true },
 
   // Sensors cannot directly connect to actuators (must go through logic)
@@ -165,7 +168,7 @@ export const NODE_COMPATIBILITY_RULES: NodeCompatibility[] = [
     sourceType: 'sensor',
     targetType: 'actuator',
     allowed: false,
-    reason: 'Sensors must connect through logic nodes before actuators'
+    reason: 'Sensors must connect through logic nodes before actuators for safety'
   },
 
   // Devices cannot directly connect to other devices
@@ -173,14 +176,54 @@ export const NODE_COMPATIBILITY_RULES: NodeCompatibility[] = [
     sourceType: 'device',
     targetType: 'device',
     allowed: false,
-    reason: 'Devices cannot directly connect to each other'
+    reason: 'Devices cannot directly connect to each other. Use sensors and actuators.'
   },
 
-  // Pumps cannot connect to temperature sensors directly
+  // Devices cannot directly connect to actuators
   {
-    sourceType: 'pump',
-    targetType: 'temperature',
+    sourceType: 'device',
+    targetType: 'actuator',
     allowed: false,
-    reason: 'Pumps cannot directly connect to temperature sensors'
-  }
+    reason: 'Devices cannot directly connect to actuators. Use sensors and logic nodes.'
+  },
+
+  // Devices cannot directly connect to logic nodes
+  {
+    sourceType: 'device',
+    targetType: 'logic',
+    allowed: false,
+    reason: 'Devices must connect through sensors first'
+  },
+
+  // Sensors cannot connect to devices
+  {
+    sourceType: 'sensor',
+    targetType: 'device',
+    allowed: false,
+    reason: 'Sensors read from devices, not write to them'
+  },
+
+  // Actuators cannot connect to sensors
+  {
+    sourceType: 'actuator',
+    targetType: 'sensor',
+    allowed: false,
+    reason: 'Actuators control devices, not sensors'
+  },
+
+  // Actuators cannot connect to logic nodes
+  {
+    sourceType: 'actuator',
+    targetType: 'logic',
+    allowed: false,
+    reason: 'Logic nodes must come before actuators, not after'
+  },
+
+  // Actuators cannot connect to other actuators
+  {
+    sourceType: 'actuator',
+    targetType: 'actuator',
+    allowed: false,
+    reason: 'Actuators cannot chain together. One actuator per device.'
+  },
 ];
