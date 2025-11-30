@@ -2,8 +2,8 @@ import { memo, useState } from 'react';
 import { Handle, Position, useReactFlow } from '@xyflow/react';
 import PropaneTankIcon from '@mui/icons-material/PropaneTank';
 import ShutterSpeedIcon from '@mui/icons-material/ShutterSpeed';
-import SchemaIcon from '@mui/icons-material/Schema';
-import SettingsIcon from '@mui/icons-material/Settings';
+import CountertopsIcon from '@mui/icons-material/Countertops';
+import BuildIcon from '@mui/icons-material/Build';
 
 interface DeviceNodeProps {
   id: string;
@@ -18,11 +18,11 @@ interface DeviceNodeProps {
 const deviceIcons: Record<string, React.ReactElement> = {
   tank: <PropaneTankIcon />,
   pump: <ShutterSpeedIcon />,
-  valve: <SchemaIcon />,
+  electrolyzer: <CountertopsIcon />,
 };
 
 function DeviceNode({ id, data, isConnectable }: DeviceNodeProps) {
-  const icon = data.deviceType ? deviceIcons[data.deviceType] : <SettingsIcon />;
+  const icon = data.deviceType ? deviceIcons[data.deviceType] : <BuildIcon />;
   const [isEditing, setIsEditing] = useState(false);
   const [label, setLabel] = useState(data.label);
   const { updateNodeData } = useReactFlow();

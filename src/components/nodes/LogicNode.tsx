@@ -68,7 +68,7 @@ function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
     if (!isNaN(numValue)) {
       if (logicType === 'delay') {
         updateNodeData(id, { config: { ...data.config, delayMs: numValue } });
-      } else if (['greater_than', 'less_than', 'equal'].includes(logicType)) {
+      } else if (['greater_than', 'less_than'].includes(logicType)) {
         updateNodeData(id, { config: { ...data.config, threshold: numValue } });
       }
     }
@@ -81,7 +81,7 @@ function LogicNode({ id, data, isConnectable }: LogicNodeProps) {
       if (!isNaN(numValue)) {
         if (logicType === 'delay') {
           updateNodeData(id, { config: { ...data.config, delayMs: numValue } });
-        } else if (['greater_than', 'less_than', 'equal'].includes(logicType)) {
+        } else if (['greater_than', 'less_than'].includes(logicType)) {
           updateNodeData(id, { config: { ...data.config, threshold: numValue } });
         }
       }

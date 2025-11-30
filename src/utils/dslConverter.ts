@@ -98,7 +98,6 @@ export class DSLConverter {
             actuatorType: actuator.nodeType as ActuatorType,
             targetId: actuator.outputs[0] || '',
             targetLabel: (targetDeviceNode?.data.label as string | undefined) || actuator.outputs[0],
-            params: actuator.config,
           },
           enabled: true,
         };
@@ -135,28 +134,11 @@ export class DSLConverter {
           };
         }
 
-        case 'not': {
-          const operand = node.inputs[0]
-            ? this.buildCondition(node.inputs[0], dslNodes, nodes)
-            : null;
-
-          if (operand) {
-            return {
-              type: 'logical',
-              operator: 'not',
-              operands: [operand],
-            };
-          }
-          break;
-        }
-
         case 'greater_than':
-        case 'less_than':
-        case 'equal': {
+        case 'less_than': {
           const operatorMap = {
             'greater_than': '>',
             'less_than': '<',
-            'equal': '==',
           } as const;
 
           const leftNode = node.inputs[0]
@@ -316,7 +298,6 @@ export class DSLConverter {
         data: {
           label: `${rule.action.actuatorType.toUpperCase()}`,
           actuatorType: rule.action.actuatorType,
-          config: rule.action.params || {},
         },
       };
       ruleNodes.push(actuatorNode);
@@ -336,7 +317,7 @@ export class DSLConverter {
         // Infer device type from ID
         let deviceType: DeviceType = 'pump';
         if (rule.action.targetId.includes('tank')) deviceType = 'tank';
-        else if (rule.action.targetId.includes('valve')) deviceType = 'valve';
+        else if (rule.action.targetId.includes('electrolyzer')) deviceType = 'electrolyzer';
         else if (rule.action.targetId.includes('pump')) deviceType = 'pump';
 
         const deviceNode: Node = {
@@ -391,7 +372,7 @@ export class DSLConverter {
         if (condition.sourceDeviceId) {
           let deviceType: DeviceType = 'tank';
           if (condition.sourceDeviceId.includes('pump')) deviceType = 'pump';
-          else if (condition.sourceDeviceId.includes('valve')) deviceType = 'valve';
+          else if (condition.sourceDeviceId.includes('electrolyzer')) deviceType = 'electrolyzer';
           else if (condition.sourceDeviceId.includes('tank')) deviceType = 'tank';
 
           const deviceNode: Node = {
@@ -441,7 +422,7 @@ export class DSLConverter {
           if (condition.left.sourceDeviceId) {
             let deviceType: DeviceType = 'tank';
             if (condition.left.sourceDeviceId.includes('pump')) deviceType = 'pump';
-            else if (condition.left.sourceDeviceId.includes('valve')) deviceType = 'valve';
+            else if (condition.left.sourceDeviceId.includes('electrolyzer')) deviceType = 'electrolyzer';
             else if (condition.left.sourceDeviceId.includes('tank')) deviceType = 'tank';
 
             const deviceNode: Node = {
@@ -487,7 +468,6 @@ export class DSLConverter {
         const operatorMap: Record<string, LogicType> = {
           '>': 'greater_than',
           '<': 'less_than',
-          '==': 'equal',
         };
 
         const logicNode: Node = {

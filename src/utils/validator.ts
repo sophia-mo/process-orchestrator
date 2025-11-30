@@ -122,24 +122,9 @@ export class WorkflowValidator {
         });
       }
 
-      // Rule: Valves typically use pressure or flow sensors
-      if (
-        sourceNode.type === 'device' &&
-        sourceNode.data.deviceType === 'valve' &&
-        targetNode.type === 'sensor' &&
-        targetNode.data.sensorType === 'level'
-      ) {
-        errors.push({
-          type: 'warning',
-          edgeId: edge.id,
-          message: 'Valves typically use pressure sensors. Consider using a pressure sensor instead of level sensor.',
-          code: 'UNUSUAL_DEVICE_SENSOR',
-        });
-      }
-
       // ========== Actuator -> Device Compatibility ==========
 
-      // Rule: Start actuators should connect to active devices (pumps, valves)
+      // Rule: Start actuators should connect to active devices (pumps, electrolyzers)
       if (
         sourceNode.type === 'actuator' &&
         sourceNode.data.actuatorType === 'start' &&
@@ -149,12 +134,12 @@ export class WorkflowValidator {
         errors.push({
           type: 'error',
           edgeId: edge.id,
-          message: 'Cannot start a tank. Tanks are passive containers. Use start actuators for pumps or valves.',
+          message: 'Cannot start a tank. Tanks are passive containers. Use start actuators for pumps or electrolyzers.',
           code: 'INVALID_ACTUATOR_DEVICE',
         });
       }
 
-      // Rule: Stop actuators should connect to active devices (pumps, valves)
+      // Rule: Stop actuators should connect to active devices (pumps, electrolyzers)
       if (
         sourceNode.type === 'actuator' &&
         sourceNode.data.actuatorType === 'stop' &&
@@ -164,7 +149,7 @@ export class WorkflowValidator {
         errors.push({
           type: 'error',
           edgeId: edge.id,
-          message: 'Cannot stop a tank. Tanks are passive containers. Use stop actuators for pumps or valves.',
+          message: 'Cannot stop a tank. Tanks are passive containers. Use stop actuators for pumps or electrolyzers.',
           code: 'INVALID_ACTUATOR_DEVICE',
         });
       }
@@ -398,20 +383,8 @@ export class WorkflowValidator {
           }
           break;
 
-        case 'not':
-          if (inputCount !== 1) {
-            errors.push({
-              type: 'error',
-              nodeId: node.id,
-              message: 'NOT node requires exactly 1 input',
-              code: 'INVALID_INPUT_COUNT',
-            });
-          }
-          break;
-
         case 'greater_than':
         case 'less_than':
-        case 'equal':
           if (inputCount < 1) {
             errors.push({
               type: 'error',

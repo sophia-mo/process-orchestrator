@@ -4,10 +4,10 @@
 
 /* Node Types */
 export type NodeCategory = 'device' | 'sensor' | 'logic' | 'actuator';
-export type DeviceType = 'tank' | 'pump' | 'valve' | 'electrolyzer' | 'heat_exchanger';
-export type SensorType = 'level' | 'temperature' | 'pressure' | 'flow_rate';
-export type LogicType = 'and' | 'or' | 'not' | 'greater_than' | 'less_than' | 'equal' | 'delay' | 'if';
-export type ActuatorType = 'start' | 'stop' | 'open' | 'close' | 'set_value';
+export type DeviceType = 'tank' | 'pump' | 'electrolyzer';
+export type SensorType = 'level' | 'temperature' | 'pressure';
+export type LogicType = 'and' | 'or' | 'greater_than' | 'less_than' | 'delay';
+export type ActuatorType = 'start' | 'stop';
 
 /* Graph Node */
 export interface GraphNode {
@@ -41,7 +41,7 @@ export interface DSLNode {
   nodeType: DeviceType | SensorType | LogicType | ActuatorType;
   inputs: string[];             // IDs of input nodes
   outputs: string[];            // IDs of output nodes
-  config: Record<string, any>;  // e.g., label: "Level Sensor"
+  config: Record<string, any>;
 }
 
 export interface Rule {
@@ -60,24 +60,24 @@ export type Condition =
 
 export interface ComparisonCondition {
   type: 'comparison';
-  operator: '>' | '<' | '>=' | '<=' | '==' | '!=';
+  operator: '>' | '<';
   left: ValueExpression;
   right: ValueExpression;
 }
 
 export interface LogicalCondition {
   type: 'logical';
-  operator: 'and' | 'or' | 'not';
+  operator: 'and' | 'or';
   operands: Condition[];
 }
 
 export interface SensorCondition {
   type: 'sensor';
   sensorId: string;
-  sensorLabel?: string; // Display label for the sensor
+  sensorLabel?: string;       // Display label for the sensor
   sensorType: SensorType;
-  property?: string; // e.g., 'level', 'temperature'
-  sourceDeviceId?: string; // Which device this sensor is measuring
+  property?: string;          // e.g., 'level', 'temperature'
+  sourceDeviceId?: string;    // Which device this sensor is measuring
   sourceDeviceLabel?: string; // Display label for the source device
 }
 
@@ -102,9 +102,8 @@ export type ValueExpression =
 export interface Action {
   type: 'actuator';
   actuatorType: ActuatorType;
-  targetId: string; // Device ID to control
+  targetId: string;     // Device ID to control
   targetLabel?: string; // Display label for the target device
-  params?: Record<string, any>;
 }
 
 /* Complete Workflow Definition */

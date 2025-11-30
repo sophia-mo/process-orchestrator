@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   Background,
@@ -13,7 +13,7 @@ import '@xyflow/react/dist/style.css';
 
 import PropaneTankIcon from '@mui/icons-material/PropaneTank';
 import ShutterSpeedIcon from '@mui/icons-material/ShutterSpeed';
-import SchemaIcon from '@mui/icons-material/Schema';
+import CountertopsIcon from '@mui/icons-material/Countertops';
 import WaterIcon from '@mui/icons-material/Water';
 import DeviceThermostatIcon from '@mui/icons-material/DeviceThermostat';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -38,13 +38,6 @@ import { DSLConverter } from '../utils/dslConverter';
 import { WorkflowValidator } from '../utils/validator';
 import type { ValidationError } from '../types/dsl';
 
-const nodeTypes: NodeTypes = {
-  device: DeviceNode,
-  sensor: SensorNode,
-  logic: LogicNode,
-  actuator: ActuatorNode,
-};
-
 export default function ProcessEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -61,16 +54,46 @@ export default function ProcessEditor() {
     severity: 'info',
   });
 
+  // Performance Optimization: Memoize nodeTypes to prevent recreation on every render
+  const nodeTypes = useMemo<NodeTypes>(
+    () => ({
+      device: DeviceNode,
+      sensor: SensorNode,
+      logic: LogicNode,
+      actuator: ActuatorNode,
+    }),
+    []
+  );
+
+  // Performance Optimization: Debounce validation to avoid excessive re-validation
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Update Rules whenever graph changes (only when not editing)
+  // Performance Optimization: Debounced validation (300ms delay)
   useEffect(() => {
     if (nodes.length > 0 && !isEditingRules) {
-      const rules = DSLConverter.graphToRules(nodes, edges);
-      setRulesJson(JSON.stringify(rules, null, 2));
+      // Clear previous timeout
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
 
-      // Validate
-      const validation = WorkflowValidator.validate(nodes, edges);
-      setValidationErrors(validation.errors);
+      // Set new timeout for debounced validation
+      validationTimeoutRef.current = setTimeout(() => {
+        const rules = DSLConverter.graphToRules(nodes, edges);
+        setRulesJson(JSON.stringify(rules, null, 2));
+
+        // Validate
+        const validation = WorkflowValidator.validate(nodes, edges);
+        setValidationErrors(validation.errors);
+      }, 300);
     }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
   }, [nodes, edges, isEditingRules]);
 
   const onConnect = useCallback(
@@ -134,12 +157,14 @@ export default function ProcessEditor() {
     [setNodes]
   );
 
-  const clearCanvas = () => {
+  // Performance Optimization: Memoize clearCanvas callback
+  const clearCanvas = useCallback(() => {
     setNodes([]);
     setEdges([]);
-  };
+  }, [setNodes, setEdges]);
 
-  const loadExample = () => {
+  // Performance Optimization: Memoize loadExample callback
+  const loadExample = useCallback(() => {
     // Load "High Level Auto-Stop Pump" example
     const exampleNodes: Node[] = [
       {
@@ -183,7 +208,35 @@ export default function ProcessEditor() {
 
     setNodes(exampleNodes);
     setEdges(exampleEdges);
-  };
+  }, [setNodes, setEdges]);
+
+  // Performance Optimization: Memoize Apply to Graph handler
+  const handleApplyToGraph = useCallback(() => {
+    try {
+      const rules = JSON.parse(rulesJson);
+      // Convert rules back to graph
+      const { nodes: newNodes, edges: newEdges } = DSLConverter.rulesToGraph(rules);
+      setNodes(newNodes);
+      setEdges(newEdges);
+      setIsEditingRules(false);
+      setSnackbar({
+        open: true,
+        message: `Rules applied! Generated ${newNodes.length} nodes and ${newEdges.length} edges.`,
+        severity: 'success',
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Error: ' + (error as Error).message,
+        severity: 'error',
+      });
+    }
+  }, [rulesJson, setNodes, setEdges]);
+
+  // Performance Optimization: Memoize snackbar close handler
+  const handleCloseSnackbar = useCallback(() => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  }, []);
 
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
@@ -202,7 +255,7 @@ export default function ProcessEditor() {
           <h4>Devices</h4>
           <NodePaletteItem type="device" subtype="tank" label="Tank" icon={<PropaneTankIcon />} />
           <NodePaletteItem type="device" subtype="pump" label="Pump" icon={<ShutterSpeedIcon />} />
-          <NodePaletteItem type="device" subtype="valve" label="Valve" icon={<SchemaIcon />} />
+          <NodePaletteItem type="device" subtype="electrolyzer" label="Electrolyzer" icon={<CountertopsIcon />} />
         </div>
 
         <div style={{ marginBottom: '20px' }}>
@@ -336,27 +389,7 @@ export default function ProcessEditor() {
             </button>
             {isEditingRules && (
               <button
-                onClick={() => {
-                  try {
-                    const rules = JSON.parse(rulesJson);
-                    // Convert rules back to graph
-                    const { nodes: newNodes, edges: newEdges } = DSLConverter.rulesToGraph(rules);
-                    setNodes(newNodes);
-                    setEdges(newEdges);
-                    setIsEditingRules(false);
-                    setSnackbar({
-                      open: true,
-                      message: `Rules applied! Generated ${newNodes.length} nodes and ${newEdges.length} edges.`,
-                      severity: 'success',
-                    });
-                  } catch (error) {
-                    setSnackbar({
-                      open: true,
-                      message: 'Error: ' + (error as Error).message,
-                      severity: 'error',
-                    });
-                  }
-                }}
+                onClick={handleApplyToGraph}
                 style={{
                   padding: '8px 12px',
                   background: '#8b5cf6',
@@ -397,11 +430,11 @@ export default function ProcessEditor() {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          onClose={handleCloseSnackbar}
           severity={snackbar.severity}
           icon={snackbar.severity === 'success' ? <CheckIcon fontSize="inherit" /> : <ErrorIcon fontSize="inherit" />}
           sx={{ width: '100%' }}
