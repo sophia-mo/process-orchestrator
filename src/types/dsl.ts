@@ -74,9 +74,11 @@ export interface LogicalCondition {
 export interface SensorCondition {
   type: 'sensor';
   sensorId: string;
+  sensorLabel?: string; // Display label for the sensor
   sensorType: SensorType;
   property?: string; // e.g., 'level', 'temperature'
   sourceDeviceId?: string; // Which device this sensor is measuring
+  sourceDeviceLabel?: string; // Display label for the source device
 }
 
 export interface DelayCondition {
@@ -86,14 +88,22 @@ export interface DelayCondition {
 }
 
 export type ValueExpression =
-  | { type: 'sensor'; sensorId: string; property?: string; sourceDeviceId?: string }
+  | {
+      type: 'sensor';
+      sensorId: string;
+      sensorLabel?: string;
+      property?: string;
+      sourceDeviceId?: string;
+      sourceDeviceLabel?: string;
+    }
   | { type: 'constant'; value: number | string | boolean }
-  | { type: 'device'; deviceId: string; property: string };
+  | { type: 'device'; deviceId: string; deviceLabel?: string; property: string };
 
 export interface Action {
   type: 'actuator';
   actuatorType: ActuatorType;
   targetId: string; // Device ID to control
+  targetLabel?: string; // Display label for the target device
   params?: Record<string, any>;
 }
 

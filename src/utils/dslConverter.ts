@@ -78,17 +78,26 @@ export class DSLConverter {
       }
 
       // Build condition from the first input node
-      const condition = this.buildCondition(actuator.inputs[0], dslNodes);
+      const condition = this.buildCondition(actuator.inputs[0], dslNodes, nodes);
 
       if (condition) {
+        // Find target device label from original React Flow nodes
+        const targetDeviceNode = actuator.outputs[0]
+          ? nodes.find((n) => n.id === actuator.outputs[0])
+          : null;
+
+        // Find actuator label from original React Flow nodes
+        const actuatorNode = nodes.find((n) => n.id === actuator.id);
+
         const rule: Rule = {
           id: `rule_${Date.now()}_${index}`,
-          name: `Rule for ${actuator.config.label || actuator.id}`,
+          name: `Rule for ${(actuatorNode?.data.label as string | undefined) || actuator.id}`,
           condition,
           action: {
             type: 'actuator',
             actuatorType: actuator.nodeType as ActuatorType,
             targetId: actuator.outputs[0] || '',
+            targetLabel: (targetDeviceNode?.data.label as string | undefined) || actuator.outputs[0],
             params: actuator.config,
           },
           enabled: true,
@@ -104,7 +113,7 @@ export class DSLConverter {
   /**
    * Build a condition tree by tracing back from a node
    */
-  private static buildCondition(nodeId: string, dslNodes: DSLNode[]): Condition | null {
+  private static buildCondition(nodeId: string, dslNodes: DSLNode[], nodes: Node[]): Condition | null {
     const node = dslNodes.find((n) => n.id === nodeId);
     if (!node) return null;
 
@@ -116,7 +125,7 @@ export class DSLConverter {
         case 'and':
         case 'or': {
           const operands = node.inputs
-            .map((inputId) => this.buildCondition(inputId, dslNodes))
+            .map((inputId) => this.buildCondition(inputId, dslNodes, nodes))
             .filter((c): c is Condition => c !== null);
 
           return {
@@ -128,7 +137,7 @@ export class DSLConverter {
 
         case 'not': {
           const operand = node.inputs[0]
-            ? this.buildCondition(node.inputs[0], dslNodes)
+            ? this.buildCondition(node.inputs[0], dslNodes, nodes)
             : null;
 
           if (operand) {
@@ -156,12 +165,19 @@ export class DSLConverter {
 
           // Find source device for sensor (trace back through sensor's inputs)
           let sourceDeviceId: string | undefined;
+          let sourceDeviceLabel: string | undefined;
           if (leftNode && leftNode.type === 'sensor' && leftNode.inputs.length > 0) {
             const sourceDevice = dslNodes.find((n) => n.id === leftNode.inputs[0]);
             if (sourceDevice && sourceDevice.type === 'device') {
               sourceDeviceId = sourceDevice.id;
+              // Get label from original React Flow node
+              const sourceDeviceReactNode = nodes.find((n) => n.id === sourceDevice.id);
+              sourceDeviceLabel = sourceDeviceReactNode?.data.label as string | undefined;
             }
           }
+
+          // Get sensor label from original React Flow node
+          const sensorReactNode = leftNode ? nodes.find((n) => n.id === leftNode.id) : null;
 
           return {
             type: 'comparison',
@@ -170,8 +186,10 @@ export class DSLConverter {
               ? {
                   type: 'sensor',
                   sensorId: leftNode.id,
+                  sensorLabel: sensorReactNode?.data.label as string | undefined,
                   property: leftNode.config.property || 'value',
                   sourceDeviceId,
+                  sourceDeviceLabel,
                 }
               : { type: 'constant', value: 0 },
             right: {
@@ -183,7 +201,7 @@ export class DSLConverter {
 
         case 'delay': {
           const innerCondition = node.inputs[0]
-            ? this.buildCondition(node.inputs[0], dslNodes)
+            ? this.buildCondition(node.inputs[0], dslNodes, nodes)
             : null;
 
           if (innerCondition) {
@@ -202,19 +220,28 @@ export class DSLConverter {
     if (node.type === 'sensor') {
       // Find source device for sensor
       let sourceDeviceId: string | undefined;
+      let sourceDeviceLabel: string | undefined;
       if (node.inputs.length > 0) {
         const sourceDevice = dslNodes.find((n) => n.id === node.inputs[0]);
         if (sourceDevice && sourceDevice.type === 'device') {
           sourceDeviceId = sourceDevice.id;
+          // Get label from original React Flow node
+          const sourceDeviceReactNode = nodes.find((n) => n.id === sourceDevice.id);
+          sourceDeviceLabel = sourceDeviceReactNode?.data.label as string | undefined;
         }
       }
+
+      // Get sensor label from original React Flow node
+      const sensorReactNode = nodes.find((n) => n.id === node.id);
 
       return {
         type: 'sensor',
         sensorId: node.id,
+        sensorLabel: sensorReactNode?.data.label as string | undefined,
         sensorType: node.nodeType as SensorType,
         property: node.config.property || 'value',
         sourceDeviceId,
+        sourceDeviceLabel,
       };
     }
 
@@ -258,7 +285,6 @@ export class DSLConverter {
 
   /**
    * Convert Rules back to graph representation
-   * This is the inverse of graphToRules - reconstructs the visual graph from DSL rules
    */
   static rulesToGraph(rules: Rule[]): { nodes: Node[]; edges: Edge[] } {
     const nodes: Node[] = [];
@@ -277,12 +303,12 @@ export class DSLConverter {
       ruleNodes.push(...conditionNodes);
       ruleEdges.push(...conditionEdges);
 
-      // Build actuator node with simple ID
+      // Build actuator node
       const actuatorId = `actuator_${rule.action.actuatorType}`;
       const actuatorNode: Node = {
         id: actuatorId,
         type: 'actuator',
-        position: { x: (conditionNodes.length + 1) * 200, y: yPosition },
+        position: { x: (conditionNodes.length + 1) * 100, y: yPosition },
         data: {
           label: `${rule.action.actuatorType.toUpperCase()}`,
           actuatorType: rule.action.actuatorType,
@@ -311,9 +337,9 @@ export class DSLConverter {
         const deviceNode: Node = {
           id: rule.action.targetId,
           type: 'device',
-          position: { x: (conditionNodes.length + 2) * 200, y: yPosition },
+          position: { x: (conditionNodes.length + 2) * 100, y: yPosition },
           data: {
-            label: rule.action.targetId,
+            label: rule.action.targetLabel || rule.action.targetId,
             deviceType,
             config: {},
           },
@@ -368,7 +394,7 @@ export class DSLConverter {
             type: 'device',
             position: { x: (xOffset - 1) * 200, y: yPosition },
             data: {
-              label: condition.sourceDeviceId,
+              label: condition.sourceDeviceLabel || condition.sourceDeviceId,
               deviceType,
               config: {},
             },
@@ -381,7 +407,7 @@ export class DSLConverter {
           type: 'sensor',
           position: { x: xOffset * 200, y: yPosition },
           data: {
-            label: `${condition.sensorType} sensor`,
+            label: condition.sensorLabel || `${condition.sensorType} sensor`,
             sensorType: condition.sensorType,
             config: { property: condition.property },
           },
@@ -416,7 +442,7 @@ export class DSLConverter {
               type: 'device',
               position: { x: (xOffset - 1) * 200, y: yPosition },
               data: {
-                label: condition.left.sourceDeviceId,
+                label: condition.left.sourceDeviceLabel || condition.left.sourceDeviceId,
                 deviceType,
                 config: {},
               },
@@ -429,7 +455,7 @@ export class DSLConverter {
             type: 'sensor',
             position: { x: xOffset * 200, y: yPosition },
             data: {
-              label: `${condition.left.sensorId}`,
+              label: condition.left.sensorLabel || condition.left.sensorId,
               sensorType: 'level', // Default
               config: { property: condition.left.property },
             },
