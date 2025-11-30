@@ -38,14 +38,11 @@ export default function ProcessEditor() {
   const [rulesJson, setRulesJson] = useState('');
   const [isEditingRules, setIsEditingRules] = useState(false);
 
-  // Update Workflow (with both Rules and Graph) whenever graph changes (only when not editing)
+  // Update Rules whenever graph changes (only when not editing)
   useEffect(() => {
     if (nodes.length > 0 && !isEditingRules) {
-      const workflow = DSLConverter.graphToWorkflow(nodes, edges, {
-        name: 'Untitled Workflow',
-        description: 'Auto-generated workflow'
-      });
-      setRulesJson(JSON.stringify(workflow, null, 2));
+      const rules = DSLConverter.graphToRules(nodes, edges);
+      setRulesJson(JSON.stringify(rules, null, 2));
 
       // Validate
       const validation = WorkflowValidator.validate(nodes, edges);
@@ -277,7 +274,7 @@ export default function ProcessEditor() {
           overflow: 'hidden',
         }}
       >
-        <h3 style={{ color: '#fff', marginTop: 0 }}>Workflow Definition</h3>
+        <h3 style={{ color: '#fff', marginTop: 0 }}>Rules (DSL)</h3>
 
         {/* Validation Errors */}
         {validationErrors.length > 0 && (
@@ -321,11 +318,8 @@ export default function ProcessEditor() {
               <>
                 <button
                   onClick={() => {
-                    const workflow = DSLConverter.graphToWorkflow(nodes, edges, {
-                      name: 'Untitled Workflow',
-                      description: 'Auto-generated workflow'
-                    });
-                    setRulesJson(JSON.stringify(workflow, null, 2));
+                    const rules = DSLConverter.graphToRules(nodes, edges);
+                    setRulesJson(JSON.stringify(rules, null, 2));
                   }}
                   style={{
                     padding: '8px 12px',
@@ -342,27 +336,23 @@ export default function ProcessEditor() {
                 <button
                   onClick={() => {
                     try {
-                      console.log('📥 Parsing workflow JSON...');
-                      const workflow = JSON.parse(rulesJson);
-                      console.log('Parsed workflow:', workflow);
+                      console.log('📥 Parsing rules JSON...');
+                      const rules = JSON.parse(rulesJson);
+                      console.log('Parsed rules:', rules);
 
-                      // Load from workflow.graph (complete graph with all nodes)
-                      if (workflow.graph && workflow.graph.nodes && workflow.graph.edges) {
-                        console.log('✅ Loading graph from workflow:');
-                        console.log('  Nodes:', workflow.graph.nodes.length);
-                        console.log('  Edges:', workflow.graph.edges.length);
+                      // Convert rules back to graph
+                      const { nodes: newNodes, edges: newEdges } = DSLConverter.rulesToGraph(rules);
+                      console.log('✅ Generated from rules:');
+                      console.log('  Nodes:', newNodes.length);
+                      console.log('  Edges:', newEdges.length);
 
-                        setNodes(workflow.graph.nodes);
-                        setEdges(workflow.graph.edges);
-                        setIsEditingRules(false);
-                        alert(`✅ Workflow applied! Loaded ${workflow.graph.nodes.length} nodes and ${workflow.graph.edges.length} edges.`);
-                      } else {
-                        console.error('❌ Missing graph data in workflow:', workflow);
-                        alert('❌ Invalid workflow format. Missing graph data.');
-                      }
+                      setNodes(newNodes);
+                      setEdges(newEdges);
+                      setIsEditingRules(false);
+                      alert(`✅ Rules applied! Generated ${newNodes.length} nodes and ${newEdges.length} edges.`);
                     } catch (error) {
-                      console.error('❌ Error parsing JSON:', error);
-                      alert('❌ Invalid JSON: ' + (error as Error).message);
+                      console.error('❌ Error:', error);
+                      alert('❌ Error: ' + (error as Error).message);
                     }
                   }}
                   style={{

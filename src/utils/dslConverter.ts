@@ -70,7 +70,7 @@ export class DSLConverter {
     // Find all actuator nodes (these are rule actions)
     const actuatorNodes = dslNodes.filter((n) => n.type === 'actuator');
 
-    actuatorNodes.forEach((actuator) => {
+    actuatorNodes.forEach((actuator, index) => {
       // Trace back to find the condition chain from the actuator's input nodes
       // An actuator should have at least one input (logic or sensor node)
       if (actuator.inputs.length === 0) {
@@ -82,9 +82,8 @@ export class DSLConverter {
 
       if (condition) {
         const rule: Rule = {
-          id: `rule_${actuator.id}`,
+          id: `rule_${Date.now()}_${index}`,
           name: `Rule for ${actuator.config.label || actuator.id}`,
-          description: `Auto-generated rule from graph`,
           condition,
           action: {
             type: 'actuator',
@@ -155,6 +154,15 @@ export class DSLConverter {
             ? dslNodes.find((n) => n.id === node.inputs[0])
             : null;
 
+          // Find source device for sensor (trace back through sensor's inputs)
+          let sourceDeviceId: string | undefined;
+          if (leftNode && leftNode.type === 'sensor' && leftNode.inputs.length > 0) {
+            const sourceDevice = dslNodes.find((n) => n.id === leftNode.inputs[0]);
+            if (sourceDevice && sourceDevice.type === 'device') {
+              sourceDeviceId = sourceDevice.id;
+            }
+          }
+
           return {
             type: 'comparison',
             operator: operatorMap[logicType],
@@ -163,6 +171,7 @@ export class DSLConverter {
                   type: 'sensor',
                   sensorId: leftNode.id,
                   property: leftNode.config.property || 'value',
+                  sourceDeviceId,
                 }
               : { type: 'constant', value: 0 },
             right: {
@@ -191,11 +200,21 @@ export class DSLConverter {
 
     // If this is a sensor node, return sensor condition
     if (node.type === 'sensor') {
+      // Find source device for sensor
+      let sourceDeviceId: string | undefined;
+      if (node.inputs.length > 0) {
+        const sourceDevice = dslNodes.find((n) => n.id === node.inputs[0]);
+        if (sourceDevice && sourceDevice.type === 'device') {
+          sourceDeviceId = sourceDevice.id;
+        }
+      }
+
       return {
         type: 'sensor',
         sensorId: node.id,
         sensorType: node.nodeType as SensorType,
         property: node.config.property || 'value',
+        sourceDeviceId,
       };
     }
 
@@ -247,10 +266,7 @@ export class DSLConverter {
     const nodeMap = new Map<string, Node>();
     let yPosition = 100;
 
-    console.log('🔄 Converting rules to graph:', rules);
-
-    rules.forEach((rule, ruleIndex) => {
-      console.log(`\n📋 Processing rule ${ruleIndex}:`, rule.name);
+    rules.forEach((rule) => {
       const ruleNodes: Node[] = [];
       const ruleEdges: Edge[] = [];
 
@@ -258,12 +274,11 @@ export class DSLConverter {
       const { nodes: conditionNodes, edges: conditionEdges, outputNodeId } =
         this.conditionToNodes(rule.condition, 0, yPosition);
 
-      console.log('  ├─ Condition nodes:', conditionNodes.length);
       ruleNodes.push(...conditionNodes);
       ruleEdges.push(...conditionEdges);
 
-      // Build actuator node with unique ID
-      const actuatorId = `actuator_${rule.action.actuatorType}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      // Build actuator node with simple ID
+      const actuatorId = `actuator_${rule.action.actuatorType}`;
       const actuatorNode: Node = {
         id: actuatorId,
         type: 'actuator',
@@ -274,7 +289,6 @@ export class DSLConverter {
           config: rule.action.params || {},
         },
       };
-      console.log('  ├─ Actuator node:', actuatorId);
       ruleNodes.push(actuatorNode);
 
       // Connect last condition node to actuator
@@ -304,7 +318,6 @@ export class DSLConverter {
             config: {},
           },
         };
-        console.log('  ├─ Device node:', rule.action.targetId, 'type:', deviceType);
         ruleNodes.push(deviceNode);
 
         // Connect actuator to device
@@ -313,30 +326,19 @@ export class DSLConverter {
           source: actuatorId,
           target: rule.action.targetId,
         });
-      } else {
-        console.log('  ├─ ⚠️ No targetId in action!');
       }
-
-      console.log('  └─ Rule nodes total:', ruleNodes.length);
 
       // Add all nodes and edges, avoiding duplicates
       ruleNodes.forEach((node) => {
         if (!nodeMap.has(node.id)) {
-          console.log('    ✅ Adding node:', node.id, node.type);
           nodeMap.set(node.id, node);
           nodes.push(node);
-        } else {
-          console.log('    ⏭️  Skipping duplicate:', node.id);
         }
       });
       edges.push(...ruleEdges);
 
       yPosition += 150; // Offset for next rule
     });
-
-    console.log('\n✅ Final nodes:', nodes.length);
-    console.log('✅ Final edges:', edges.length);
-    console.log('Nodes:', nodes.map(n => `${n.id} (${n.type})`));
 
     return { nodes, edges };
   }
@@ -354,6 +356,26 @@ export class DSLConverter {
 
     switch (condition.type) {
       case 'sensor': {
+        // Create source device if specified
+        if (condition.sourceDeviceId) {
+          let deviceType: DeviceType = 'tank';
+          if (condition.sourceDeviceId.includes('pump')) deviceType = 'pump';
+          else if (condition.sourceDeviceId.includes('valve')) deviceType = 'valve';
+          else if (condition.sourceDeviceId.includes('tank')) deviceType = 'tank';
+
+          const deviceNode: Node = {
+            id: condition.sourceDeviceId,
+            type: 'device',
+            position: { x: (xOffset - 1) * 200, y: yPosition },
+            data: {
+              label: condition.sourceDeviceId,
+              deviceType,
+              config: {},
+            },
+          };
+          nodes.push(deviceNode);
+        }
+
         const sensorNode: Node = {
           id: condition.sensorId,
           type: 'sensor',
@@ -365,6 +387,16 @@ export class DSLConverter {
           },
         };
         nodes.push(sensorNode);
+
+        // Connect device to sensor if source device exists
+        if (condition.sourceDeviceId) {
+          edges.push({
+            id: `${condition.sourceDeviceId}-${condition.sensorId}`,
+            source: condition.sourceDeviceId,
+            target: condition.sensorId,
+          });
+        }
+
         return { nodes, edges, outputNodeId: condition.sensorId };
       }
 
@@ -372,6 +404,26 @@ export class DSLConverter {
         // Create sensor node from left side
         let sensorId = '';
         if (condition.left.type === 'sensor') {
+          // Create source device if specified
+          if (condition.left.sourceDeviceId) {
+            let deviceType: DeviceType = 'tank';
+            if (condition.left.sourceDeviceId.includes('pump')) deviceType = 'pump';
+            else if (condition.left.sourceDeviceId.includes('valve')) deviceType = 'valve';
+            else if (condition.left.sourceDeviceId.includes('tank')) deviceType = 'tank';
+
+            const deviceNode: Node = {
+              id: condition.left.sourceDeviceId,
+              type: 'device',
+              position: { x: (xOffset - 1) * 200, y: yPosition },
+              data: {
+                label: condition.left.sourceDeviceId,
+                deviceType,
+                config: {},
+              },
+            };
+            nodes.push(deviceNode);
+          }
+
           const sensorNode: Node = {
             id: condition.left.sensorId,
             type: 'sensor',
@@ -384,6 +436,15 @@ export class DSLConverter {
           };
           nodes.push(sensorNode);
           sensorId = condition.left.sensorId;
+
+          // Connect device to sensor if source device exists
+          if (condition.left.sourceDeviceId) {
+            edges.push({
+              id: `${condition.left.sourceDeviceId}-${condition.left.sensorId}`,
+              source: condition.left.sourceDeviceId,
+              target: condition.left.sensorId,
+            });
+          }
         }
 
         // Create logic node for comparison
@@ -492,14 +553,13 @@ export class DSLConverter {
   static graphToWorkflow(
     nodes: Node[],
     edges: Edge[],
-    metadata: { name: string; description?: string; author?: string }
+    metadata: { name: string; author?: string }
   ): WorkflowDefinition {
     const rules = this.graphToRules(nodes, edges);
 
     return {
       id: `workflow_${Date.now()}`,
       name: metadata.name,
-      description: metadata.description,
       version: '1.0.0',
       rules,
       graph: {

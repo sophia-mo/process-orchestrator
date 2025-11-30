@@ -47,7 +47,6 @@ export interface DSLNode {
 export interface Rule {
   id: string;
   name: string;
-  description?: string;
   condition: Condition;
   action: Action;
   enabled: boolean;
@@ -77,6 +76,7 @@ export interface SensorCondition {
   sensorId: string;
   sensorType: SensorType;
   property?: string; // e.g., 'level', 'temperature'
+  sourceDeviceId?: string; // Which device this sensor is measuring
 }
 
 export interface DelayCondition {
@@ -86,7 +86,7 @@ export interface DelayCondition {
 }
 
 export type ValueExpression =
-  | { type: 'sensor'; sensorId: string; property?: string }
+  | { type: 'sensor'; sensorId: string; property?: string; sourceDeviceId?: string }
   | { type: 'constant'; value: number | string | boolean }
   | { type: 'device'; deviceId: string; property: string };
 
